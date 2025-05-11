@@ -2,6 +2,7 @@ package com.mineinabyss.keepup.api
 
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.github.GithubConfig
+import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import com.mineinabyss.keepup.downloads.parsing.DownloadParser
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.similarfiles.SimilarFileChecker
@@ -21,6 +22,7 @@ class KeepupDownloader(
     val http: HttpClient,
     val config: KeepupDownloaderConfig,
     val githubConfig: GithubConfig,
+    val nexusConfig: NexusConfig,
     val downloadDispatcher: CoroutineDispatcher = Dispatchers.IO,
     val maxConcurrentDownloads: Int = 4,
 ) {
@@ -38,6 +40,7 @@ class KeepupDownloader(
             failAllDownloads = config.failAllDownloads,
             client = http,
             githubConfig = githubConfig,
+            nexusConfig = nexusConfig,
             similarFileChecker = similarFileChecker,
         )
         sources.map { source ->

@@ -20,6 +20,7 @@ import com.mineinabyss.keepup.api.*
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride
+import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.helpers.clearSymlinks
 import com.mineinabyss.keepup.helpers.linkToDest
@@ -84,6 +85,25 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         )
     }
 
+    val nexusBaseUrl by option(help = "Base URL for Nexus repository")
+        .default("https://repo.maven.apache.org/maven2")
+    val nexusUsername by option(help = "Username for Nexus repository")
+    val nexusPassword by option(help = "Password for Nexus repository")
+    val nexusDefaultExtension by option(help = "Default extension for Nexus repository")
+        .default("jar")
+    val nexusDefaultClassifier by option(help = "Default classifier for Nexus repository")
+        .default("all")
+
+    val nexusConfig by lazy {
+        NexusConfig(
+            baseUrl = nexusBaseUrl,
+            username = nexusUsername,
+            password = nexusPassword,
+            defaultExtension = nexusDefaultExtension,
+            defaultClassifier = nexusDefaultClassifier,
+        )
+    }
+
     override fun run() {
         val keepup = Keepup()
         val downloader = keepup.downloader(
@@ -93,6 +113,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
                 failAllDownloads = failAllDownloads,
             ),
             githubConfig = githubConfig,
+            nexusConfig = nexusConfig,
         )
         val parser = keepup.catalogParser()
 

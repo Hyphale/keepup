@@ -6,6 +6,8 @@ import com.mineinabyss.keepup.downloads.github.GithubArtifact
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubDownload
 import com.mineinabyss.keepup.downloads.http.HttpDownloader
+import com.mineinabyss.keepup.downloads.nexus.NexusConfig
+import com.mineinabyss.keepup.downloads.nexus.NexusDownload
 import com.mineinabyss.keepup.downloads.rclone.RcloneDownloader
 import com.mineinabyss.keepup.similarfiles.SimilarFileChecker
 import com.mineinabyss.keepup.type_checker.FileTypeChecker
@@ -19,6 +21,7 @@ class DownloadParser(
     val failAllDownloads: Boolean,
     val client: HttpClient,
     val githubConfig: GithubConfig,
+    val nexusConfig: NexusConfig,
     val similarFileChecker: SimilarFileChecker?,
 ) {
     val httpRegex = "^https?://.*".toRegex()
@@ -45,7 +48,7 @@ class DownloadParser(
                 artifact = GithubArtifact.from(source),
                 targetDir = targetDir,
             )
-
+            source.query.startsWith("nexus:")    -> NexusDownload(client, nexusConfig, source, targetDir)
             source.query.matches(httpRegex) -> HttpDownloader(client, source, targetDir)
             else -> RcloneDownloader(source, targetDir)
         }

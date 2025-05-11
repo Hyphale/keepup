@@ -26,10 +26,10 @@ jobs:
         shell: bash
         run: chmod +x gradlew
 
-      - name: Run gradle publish and build
-        run: >
-          ./gradlew publish shadowDistZip
-          -PmineinabyssMavenUsername=${{ secrets.MAVEN_PUBLISH_USERNAME }} -PmineinabyssMavenPassword=${{ secrets.MAVEN_PUBLISH_PASSWORD }}
+#      - name: Run gradle publish and build
+#        run: >
+#          ./gradlew publish shadowDistZip
+#          -PmineinabyssMavenUsername=${{ secrets.MAVEN_PUBLISH_USERNAME }} -PmineinabyssMavenPassword=${{ secrets.MAVEN_PUBLISH_PASSWORD }}
 
       - name: Run native compile
         run: ./gradlew nativeCompile
