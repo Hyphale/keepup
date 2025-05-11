@@ -8,113 +8,121 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.content.*
 import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 
 /**
- * Configuration for Nexus Download, including optional basic auth.
+ * Configuration for Nexus download with optional basic auth.
  */
 data class NexusConfig(
-    val baseUrl: String = "nexus.example.com",
+    val baseUrl: String = "ignored",
     val username: String? = null,
     val password: String? = null,
     val defaultClassifier: String? = null,
-    val defaultExtension: String = "jar"
+    val defaultExtension: String = "jar",
 )
 
 /**
- * Parsed Maven artifact coordinates for Nexus.
+ * Represents a Maven artifact coordinate.
  */
 data class NexusArtifact(
     val group: String,
     val name: String,
     val version: String,
     var classifier: String? = null,
-    var extension: String = "jar"
+    var extension: String = "jar",
 ) {
+
+    fun toFileName(): String {
+        val baseName = "$name-$version"
+        val classifierSuffix = classifier?.let { "-$it" } ?: ""
+        return "$baseName$classifierSuffix.$extension"
+    }
+
     companion object {
         /**
-         * Expect query in form "nexus:group:artifact:version[:classifier][@extension]".
+         * Parses "nexus:group:artifact:version[:classifier][@extension]".
          */
         fun from(source: DownloadSource): NexusArtifact {
             val coord = source.query.removePrefix("nexus:")
-            val partsExt = coord.split("@", limit = 2)
-            val left = partsExt[0]
-            val ext = partsExt.getOrNull(1).orEmpty()
-            val tokens = left.split(":")
+            val parts = coord.split("@", limit = 2)
+            val tokens = parts[0].split(":")
             require(tokens.size in 3..4) { "Invalid Nexus coordinate: $coord" }
+            val ext = parts.getOrNull(1).orEmpty().ifBlank { "jar" }
             return NexusArtifact(
                 group = tokens[0],
                 name = tokens[1],
                 version = tokens[2],
                 classifier = tokens.getOrNull(3),
-                extension = ext.ifBlank { "jar" }
+                extension = ext
             )
         }
     }
-
-    /**
-     * Builds the repository path for the artifact.
-     */
-    fun path(): String = listOf(
-        group.replace('.', '/'),
-        name,
-        version,
-        "${name}-${version}${classifier?.let { "-" + it }.orEmpty()}.${extension}"
-    ).joinToString("/")
 }
 
 /**
- * Downloader that fetches artifacts from Nexus3 repositories via the REST API, supporting basic auth.
+ * Downloads artifacts from Nexus3, picking the highest semver version matching classifier and extension.
+ * Skips if the target file already exists in targetDir.
  */
 class NexusDownload(
     private val client: HttpClient,
     private val config: NexusConfig,
     private val source: DownloadSource,
-    private val targetDir: Path
+    private val targetDir: Path,
 ) : Downloader {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun download(): List<DownloadResult> {
-        val artifact = NexusArtifact.from(source)
-        artifact.classifier = artifact.classifier ?: config.defaultClassifier
-        artifact.extension = artifact.extension.ifBlank { config.defaultExtension }
+        val artifact = NexusArtifact.from(source).apply {
+            classifier = classifier ?: config.defaultClassifier
+            extension = extension.ifBlank { config.defaultExtension }
+        }
 
-        // Build basic auth header if credentials provided
-        val authHeader = if (!config.username.isNullOrBlank() && config.password != null) {
-            val creds = "${config.username}:${config.password}"
-            "Basic " + Base64.getEncoder().encodeToString(creds.toByteArray())
-        } else null
+        val initFile = targetDir.resolve(artifact.toFileName())
 
-        // Construct search URL
-        val base = if (config.baseUrl.startsWith("http")) config.baseUrl else "https://${config.baseUrl}"
-        val searchUri = URLBuilder("${base}/service/rest/v1/search").apply {
+        // 1. Skip if target already exists
+        if (initFile.exists()) {
+            return listOf(DownloadResult.SkippedBecauseCached(initFile, source.keyInConfig))
+        }
+
+        // Basic auth header if provided
+        val authHeader = config.username?.takeIf { it.isNotBlank() }?.let { user ->
+            config.password?.let { pass ->
+                val creds = "$user:$pass"
+                "Basic ${Base64.getEncoder().encodeToString(creds.toByteArray())}"
+            }
+        }
+
+        // Build search URL
+        val base = config.baseUrl.takeIf { it.startsWith("http") } ?: "https://${config.baseUrl}"
+        val searchUri = URLBuilder("$base/service/rest/v1/search").apply {
             parameters.append("group", artifact.group)
             parameters.append("name", artifact.name)
             parameters.append("version", artifact.version)
         }.buildString()
 
-        // Perform search with optional auth
+        // Execute search
         val resp = client.get(searchUri) {
             authHeader?.let { header(HttpHeaders.Authorization, it) }
-        }
+        } as HttpResponse
         if (resp.status != HttpStatusCode.OK) {
             return listOf(
-                DownloadResult.Failure(
-                    "Nexus search failed: HTTP ${resp.status.value}",
-                    source.keyInConfig
-                )
+                DownloadResult.Failure("Nexus search failed: HTTP ${resp.status.value}", source.keyInConfig)
             )
         }
 
+        // Parse items
         val items = json.parseToJsonElement(resp.bodyAsText())
             .jsonObject["items"]?.jsonArray.orEmpty()
         if (items.isEmpty()) {
@@ -126,27 +134,25 @@ class NexusDownload(
             )
         }
 
-        // Select highest version via downloadUrl
+        // Select highest version asset via downloadUrl filename
         var bestVersion: Version? = null
         var bestAssetUrl: String? = null
-        for (item in items) {
-            val verStr = item.jsonObject["version"]?.jsonPrimitive?.content ?: continue
-            val v = runCatching { Version.valueOf(verStr) }.getOrNull() ?: continue
-            var candidateUrl: String? = null
+        items.forEach { item ->
+            val verStr = item.jsonObject["version"]?.jsonPrimitive?.content ?: return@forEach
+            val v = runCatching { Version.valueOf(verStr) }.getOrNull() ?: return@forEach
             item.jsonObject["assets"]?.jsonArray.orEmpty().forEach { asset ->
                 val urlField = asset.jsonObject["downloadUrl"]?.jsonPrimitive?.content ?: return@forEach
                 val filename = urlField.substringAfterLast("/")
                 if (!filename.endsWith(".${artifact.extension}")) return@forEach
-                if (!artifact.classifier.isNullOrBlank() && !filename.contains("-${artifact.classifier}.")) return@forEach
-                candidateUrl = urlField
-                return@forEach
-            }
-            if (candidateUrl != null && (bestVersion == null || v.greaterThan(bestVersion))) {
-                bestVersion = v
-                bestAssetUrl = candidateUrl
+                artifact.classifier?.let { cls -> if (!filename.contains("-$cls.")) return@forEach }
+                if (bestVersion == null || v.greaterThan(bestVersion)) {
+                    bestVersion = v
+                    bestAssetUrl = urlField
+                }
             }
         }
 
+        // If no asset found
         val downloadUrl = bestAssetUrl ?: return listOf(
             DownloadResult.Failure(
                 "No matching asset for ${artifact.group}:${artifact.name}:${artifact.version}" +
@@ -155,12 +161,19 @@ class NexusDownload(
             )
         )
 
-        // Prepare output
+        // Determine output file path
         val filename = downloadUrl.substringAfterLast("/")
-        targetDir.createDirectories()
         val outFile = targetDir.resolve(filename)
 
-        // Stream download with auth
+        // 1. Skip if target already exists
+        if (outFile.exists()) {
+            return listOf(DownloadResult.SkippedBecauseCached(outFile, source.keyInConfig))
+        }
+
+        // Ensure targetDir exists
+        targetDir.createDirectories()
+
+        // Stream download
         val channel = client.get(downloadUrl) {
             authHeader?.let { header(HttpHeaders.Authorization, it) }
         }.bodyAsChannel()
