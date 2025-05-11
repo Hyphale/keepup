@@ -1,5 +1,6 @@
 package com.mineinabyss.keepup.downloads.nexus
 
+import com.github.zafarkhaja.semver.Version
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.Downloader
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
@@ -7,6 +8,7 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -103,7 +105,7 @@ class NexusDownload(
         // Perform search with optional auth
         val resp = client.get(searchUri) {
             authHeader?.let { header(HttpHeaders.Authorization, it) }
-        } as HttpResponse
+        }
         if (resp.status != HttpStatusCode.OK) {
             return listOf(
                 DownloadResult.Failure(
@@ -113,7 +115,6 @@ class NexusDownload(
             )
         }
 
-        // Parse JSON response
         val items = json.parseToJsonElement(resp.bodyAsText())
             .jsonObject["items"]?.jsonArray.orEmpty()
         if (items.isEmpty()) {
@@ -125,23 +126,34 @@ class NexusDownload(
             )
         }
 
-        // Find matching asset URL
-        val downloadUrl = items
-            .asSequence()
-            .flatMap { it.jsonObject["assets"]?.jsonArray.orEmpty().asSequence() }
-            .mapNotNull { asset ->
-                val urlField = asset.jsonObject["downloadUrl"]?.jsonPrimitive?.content
-                val classifier = asset.jsonObject["classifier"]?.jsonPrimitive?.contentOrNull
-                if (urlField != null && classifier == artifact.classifier && urlField.endsWith(".${artifact.extension}")) urlField
-                else null
+        // Select highest version via downloadUrl
+        var bestVersion: Version? = null
+        var bestAssetUrl: String? = null
+        for (item in items) {
+            val verStr = item.jsonObject["version"]?.jsonPrimitive?.content ?: continue
+            val v = runCatching { Version.valueOf(verStr) }.getOrNull() ?: continue
+            var candidateUrl: String? = null
+            item.jsonObject["assets"]?.jsonArray.orEmpty().forEach { asset ->
+                val urlField = asset.jsonObject["downloadUrl"]?.jsonPrimitive?.content ?: return@forEach
+                val filename = urlField.substringAfterLast("/")
+                if (!filename.endsWith(".${artifact.extension}")) return@forEach
+                if (!artifact.classifier.isNullOrBlank() && !filename.contains("-${artifact.classifier}.")) return@forEach
+                candidateUrl = urlField
+                return@forEach
             }
-            .firstOrNull()
-            ?: return listOf(
-                DownloadResult.Failure(
-                    "No matching asset for classifier=${artifact.classifier}, extension=${artifact.extension}",
-                    source.keyInConfig
-                )
+            if (candidateUrl != null && (bestVersion == null || v.greaterThan(bestVersion))) {
+                bestVersion = v
+                bestAssetUrl = candidateUrl
+            }
+        }
+
+        val downloadUrl = bestAssetUrl ?: return listOf(
+            DownloadResult.Failure(
+                "No matching asset for ${artifact.group}:${artifact.name}:${artifact.version}" +
+                        " (classifier=${artifact.classifier}, extension=${artifact.extension})",
+                source.keyInConfig
             )
+        )
 
         // Prepare output
         val filename = downloadUrl.substringAfterLast("/")

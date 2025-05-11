@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.mordant)
     implementation("io.pebbletemplates:pebble:3.2.3")
+    implementation("com.github.zafarkhaja:java-semver:0.10.2")
 }
 
 java {

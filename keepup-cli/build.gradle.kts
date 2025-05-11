@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.slf4j)
     testImplementation(kotlin("test"))
     implementation("io.pebbletemplates:pebble:3.2.2")
+    implementation("com.github.zafarkhaja:java-semver:0.10.2")
 }
 
 application {
