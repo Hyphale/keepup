@@ -105,7 +105,6 @@ class PluginsCommand : CliktCommand(name = "plugins") {
     }
 
     override fun run() {
-        t.println("$githubAuthToken")
         val keepup = Keepup()
         val downloader = keepup.downloader(
             config = KeepupDownloaderConfig(

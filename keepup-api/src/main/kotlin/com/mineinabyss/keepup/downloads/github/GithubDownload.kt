@@ -5,7 +5,6 @@ import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.Downloader
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST_RELEASE
-import com.mineinabyss.keepup.downloads.http.HttpAuth
 import com.mineinabyss.keepup.downloads.http.HttpDownloader
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.helpers.MSG
@@ -45,7 +44,8 @@ class GithubDownload(
 
     @Serializable
     data class Asset(
-        val browser_download_url: String,
+        val name: String,
+        val url: String,
     )
 
     @Serializable
@@ -102,9 +102,6 @@ class GithubDownload(
                 )
             )
         }
-        val downloadURLs = release.assets
-            .map { it.browser_download_url }
-            .filter { it.contains(artifact.calculatedRegex) }
 
         val fullName = TextColors.yellow(artifact.source.keyInConfig)
 
@@ -113,16 +110,23 @@ class GithubDownload(
         }
 
         return coroutineScope {
-            downloadURLs.map { url ->
-                async {
-                    HttpDownloader(
-                        client = client,
-                        source = DownloadSource(artifact.source.keyInConfig, url),
-                        targetDir = targetDir,
-                        auth = config.githubAuthToken?.let { HttpAuth.Bearer(it) },
-                    ).download()
-                }
-            }.awaitAll().flatten()
+            release.assets
+                .filter { it.name.contains(artifact.calculatedRegex) }
+                .map {
+                    async {
+                        HttpDownloader(
+                            client = client,
+                            source = DownloadSource(artifact.source.keyInConfig, it.url),
+                            targetDir = targetDir,
+                            fileName = it.name,
+                            transformHeader = {
+                                header(HttpHeaders.Accept, "application/octet-stream")
+                                if (config.githubAuthToken != null)
+                                    header(HttpHeaders.Authorization, "Bearer ${config.githubAuthToken}")
+                            }
+                        ).download()
+                    }
+                }.awaitAll().flatten()
         }
     }
 }

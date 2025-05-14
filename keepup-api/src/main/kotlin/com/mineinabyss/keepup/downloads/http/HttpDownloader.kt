@@ -11,23 +11,8 @@ import io.ktor.http.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 import java.nio.file.Path
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.io.path.*
 import kotlin.time.Duration.Companion.seconds
-
-sealed interface HttpAuth {
-
-    data class Basic(
-        val username: String,
-        val password: String,
-    ) : HttpAuth
-
-    data class Bearer(
-        val token: String,
-    ) : HttpAuth
-
-}
 
 class HttpDownloader(
     val client: HttpClient,
@@ -35,7 +20,7 @@ class HttpDownloader(
     val targetDir: Path,
     val fileName: String = source.query.substringAfterLast("/"),
     val overrideWhenHeadersChange: Boolean = false,
-    val auth: HttpAuth? = null,
+    val transformHeader: HttpRequestBuilder.() -> Unit = { },
 ) : Downloader {
     suspend fun getCacheString(query: String): String {
         val headers = client.head(source.query)
@@ -44,7 +29,6 @@ class HttpDownloader(
         return "Last-Modified: $lastModified, Content-Length: $length"
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun download(): List<DownloadResult> {
         val cacheFile = targetDir.resolve("$fileName.cache")
         val targetFile = targetDir.resolve(fileName)
@@ -58,18 +42,14 @@ class HttpDownloader(
 
         // Write to partial file, then move it to target once download is complete
         partial.deleteIfExists()
-        val response = client.prepareGet {
+
+        val response = client.get {
             url(source.query)
             timeout {
                 requestTimeoutMillis = 30.seconds.inWholeMilliseconds
             }
-
-            if (auth is HttpAuth.Basic) {
-                header(HttpHeaders.Authorization, "Basic ${Base64.encode("${auth.username}:${auth.password}".toByteArray())}")
-            } else if (auth is HttpAuth.Bearer) {
-                header(HttpHeaders.Authorization, "Bearer ${auth.token}")
-            }
-        }.execute();
+            transformHeader()
+        }
 
         if (response.status != HttpStatusCode.OK) {
             return listOf(
