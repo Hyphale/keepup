@@ -10,7 +10,11 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -32,7 +36,6 @@ class HttpDownloader(
     override suspend fun download(): List<DownloadResult> {
         val cacheFile = targetDir.resolve("$fileName.cache")
         val targetFile = targetDir.resolve(fileName)
-        val partial = targetDir.resolve("$fileName.partial")
         val cacheString = if (overrideWhenHeadersChange) getCacheString(source.query) else null
 
         // Check if target already exists and skip if it does, check last modified headers if overrideWhenHeadersChange is true
@@ -40,36 +43,33 @@ class HttpDownloader(
             return listOf(DownloadResult.SkippedBecauseCached(targetFile, source.keyInConfig))
 
 
-        // Write to partial file, then move it to target once download is complete
-        partial.deleteIfExists()
+        return withContext(Dispatchers.IO) {
+            targetFile.deleteIfExists()
 
-        val response = client.get {
-            url(source.query)
-            timeout {
-                requestTimeoutMillis = 30.seconds.inWholeMilliseconds
+            val response = client.get {
+                url(source.query)
+                timeout {
+                    requestTimeoutMillis = 30.seconds.inWholeMilliseconds
+                }
+                transformHeader()
             }
-            transformHeader()
-        }
 
-        if (response.status != HttpStatusCode.OK) {
-            return listOf(
-                DownloadResult.Failure(
-                    message = "Failed to download ${source.query}, status code: ${response.status}",
-                    keyInConfig = source.keyInConfig,
+            if (response.status != HttpStatusCode.OK) {
+                return@withContext listOf(
+                    DownloadResult.Failure(
+                        message = "Failed to download ${source.query}, status code: ${response.status}",
+                        keyInConfig = source.keyInConfig,
+                    )
                 )
-            )
+            }
+
+            response.bodyAsChannel()
+                .copyAndClose(targetFile.toFile().writeChannel())
+
+            // Only mark as cached after download is complete
+            cacheFile.deleteIfExists()
+            cacheFile.createFile().writeText(cacheString ?: getCacheString(source.query))
+            return@withContext listOf(DownloadResult.Downloaded(targetFile, source.keyInConfig))
         }
-
-        response.bodyAsChannel()
-            .copyAndClose(partial.toFile().writeChannel())
-
-        targetFile.deleteIfExists()
-        partial.moveTo(targetFile)
-
-        // Only mark as cached after download is complete
-        cacheFile.deleteIfExists()
-        cacheFile.createFile().writeText(cacheString ?: getCacheString(source.query))
-
-        return listOf(DownloadResult.Downloaded(targetFile, source.keyInConfig))
     }
 }
