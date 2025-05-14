@@ -11,8 +11,23 @@ import io.ktor.http.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 import java.nio.file.Path
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.io.path.*
 import kotlin.time.Duration.Companion.seconds
+
+sealed interface HttpAuth {
+
+    data class Basic(
+        val username: String,
+        val password: String,
+    ) : HttpAuth
+
+    data class Bearer(
+        val token: String,
+    ) : HttpAuth
+
+}
 
 class HttpDownloader(
     val client: HttpClient,
@@ -20,6 +35,7 @@ class HttpDownloader(
     val targetDir: Path,
     val fileName: String = source.query.substringAfterLast("/"),
     val overrideWhenHeadersChange: Boolean = false,
+    val auth: HttpAuth? = null,
 ) : Downloader {
     suspend fun getCacheString(query: String): String {
         val headers = client.head(source.query)
@@ -28,6 +44,7 @@ class HttpDownloader(
         return "Last-Modified: $lastModified, Content-Length: $length"
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun download(): List<DownloadResult> {
         val cacheFile = targetDir.resolve("$fileName.cache")
         val targetFile = targetDir.resolve(fileName)
@@ -38,17 +55,33 @@ class HttpDownloader(
         if (targetFile.exists() && (cacheString == null || (cacheFile.exists() && cacheFile.readText() == cacheString)))
             return listOf(DownloadResult.SkippedBecauseCached(targetFile, source.keyInConfig))
 
+
         // Write to partial file, then move it to target once download is complete
         partial.deleteIfExists()
-        client.prepareGet {
+        val response = client.prepareGet {
             url(source.query)
             timeout {
                 requestTimeoutMillis = 30.seconds.inWholeMilliseconds
             }
-        }.execute {
-            it.bodyAsChannel()
-                .copyAndClose(partial.toFile().writeChannel())
+
+            if (auth is HttpAuth.Basic) {
+                header(HttpHeaders.Authorization, "Basic ${Base64.encode("${auth.username}:${auth.password}".toByteArray())}")
+            } else if (auth is HttpAuth.Bearer) {
+                header(HttpHeaders.Authorization, "Bearer ${auth.token}")
+            }
+        }.execute();
+
+        if (response.status != HttpStatusCode.OK) {
+            return listOf(
+                DownloadResult.Failure(
+                    message = "Failed to download ${source.query}, status code: ${response.status}",
+                    keyInConfig = source.keyInConfig,
+                )
+            )
         }
+
+        response.bodyAsChannel()
+            .copyAndClose(partial.toFile().writeChannel())
 
         targetFile.deleteIfExists()
         partial.moveTo(targetFile)

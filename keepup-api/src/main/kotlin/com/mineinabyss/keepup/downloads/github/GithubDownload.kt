@@ -5,6 +5,7 @@ import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.Downloader
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST_RELEASE
+import com.mineinabyss.keepup.downloads.http.HttpAuth
 import com.mineinabyss.keepup.downloads.http.HttpDownloader
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.helpers.MSG
@@ -113,7 +114,14 @@ class GithubDownload(
 
         return coroutineScope {
             downloadURLs.map { url ->
-                async { HttpDownloader(client, DownloadSource(artifact.source.keyInConfig, url), targetDir).download() }
+                async {
+                    HttpDownloader(
+                        client = client,
+                        source = DownloadSource(artifact.source.keyInConfig, url),
+                        targetDir = targetDir,
+                        auth = config.githubAuthToken?.let { HttpAuth.Bearer(it) },
+                    ).download()
+                }
             }.awaitAll().flatten()
         }
     }
