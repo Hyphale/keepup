@@ -55,7 +55,6 @@ class HttpDownloader(
             }
 
             if (response.status != HttpStatusCode.OK) {
-                println(response.bodyAsText())
                 return@withContext listOf(
                     DownloadResult.Failure(
                         message = "Failed to download ${source.query}, status code: ${response.status}",
