@@ -17,6 +17,7 @@ object MSG {
     val failure = brightRed("[Failure]   ")
     val cached = brightGreen("[Use Cached]")
     val github = gray("[Github]    ")
+    val gitlab = gray("[Gitlab]    ")
     val rclone = brightBlue("[Rclone]    ")
     val skipped = brightYellow("[Ignoring]  ")
 

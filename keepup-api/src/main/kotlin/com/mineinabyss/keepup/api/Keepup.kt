@@ -2,6 +2,7 @@ package com.mineinabyss.keepup.api
 
 import com.mineinabyss.keepup.config_sync.Inventory
 import com.mineinabyss.keepup.downloads.github.GithubConfig
+import com.mineinabyss.keepup.downloads.gitlab.GitlabConfig
 import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -24,11 +25,13 @@ data class Keepup(
     fun downloader(
         config: KeepupDownloaderConfig,
         githubConfig: GithubConfig = GithubConfig(),
+        gitlabConfig: GitlabConfig = GitlabConfig(),
         nexusConfig: NexusConfig = NexusConfig(),
     ) = KeepupDownloader(
         http = http,
         config = config,
         githubConfig = githubConfig,
+        gitlabConfig = gitlabConfig,
         nexusConfig = nexusConfig,
     )
 

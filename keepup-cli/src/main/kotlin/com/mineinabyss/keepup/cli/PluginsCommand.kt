@@ -20,6 +20,7 @@ import com.mineinabyss.keepup.api.*
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride
+import com.mineinabyss.keepup.downloads.gitlab.GitlabConfig
 import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.helpers.clearSymlinks
@@ -75,12 +76,21 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         .convert { Duration.parse(it) }
         .default(10.minutes)
 
-    val githubAuthToken: String? by option(help = "Used to access private repos or get a higher rate limit")
+    val githubAuthToken: String? by option(help = "Used to access private repos or get a higher rate limit on github repositories")
+
+    val gitlabAccessToken: String? by option(help = "Used to access private repos or get a higher rate limit on gitlab repositories")
 
     val githubConfig by lazy {
         GithubConfig(
             githubAuthToken = githubAuthToken,
             overrideGithubRelease = overrideGithubRelease,
+            cacheExpirationTime = cacheExpirationTime,
+        )
+    }
+
+    val gitlabConfig by lazy {
+        GitlabConfig(
+            gitlabAccessToken = gitlabAccessToken,
             cacheExpirationTime = cacheExpirationTime,
         )
     }
@@ -113,6 +123,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
                 failAllDownloads = failAllDownloads,
             ),
             githubConfig = githubConfig,
+            gitlabConfig = gitlabConfig,
             nexusConfig = nexusConfig,
         )
         val parser = keepup.catalogParser()

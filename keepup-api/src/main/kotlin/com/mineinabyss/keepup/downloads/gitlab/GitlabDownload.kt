@@ -1,10 +1,8 @@
-package com.mineinabyss.keepup.downloads.github
+package com.mineinabyss.keepup.downloads.gitlab
 
 import com.github.ajalt.mordant.rendering.TextColors
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.Downloader
-import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST
-import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride.LATEST_RELEASE
 import com.mineinabyss.keepup.downloads.http.HttpDownloader
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.helpers.MSG
@@ -19,6 +17,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -27,20 +26,26 @@ import kotlin.io.path.div
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Ex url "github:MineInAbyss/Idofront:v0.20.6:*.jar"
+ * Ex url "gitlab:MineInAbyss/Idofront:v0.20.6:*.jar"
  */
-class GithubDownload(
+class GitlabDownload(
     val client: HttpClient,
-    val config: GithubConfig,
+    val config: GitlabConfig,
     val artifact: RepositoryArtifact,
     val targetDir: Path,
 ) : Downloader {
     val json = Json { ignoreUnknownKeys = true }
 
     @Serializable
-    data class GithubRelease(
-        val published_at: String,
-        val assets: List<Asset>,
+    data class GitlabRelease(
+        @Suppress("PropertyName")
+        val released_at: String,
+        val assets: Assets,
+    )
+
+    @Serializable
+    data class Assets(
+        val links: List<Asset>
     )
 
     @Serializable
@@ -49,52 +54,50 @@ class GithubDownload(
         val url: String,
     )
 
-    @Serializable
-    data class GithubErrorMessage(
-        val message: String,
-    )
-
     override suspend fun download(): List<DownloadResult> {
-        val version = when (config.overrideGithubRelease) {
-            LATEST, LATEST_RELEASE -> "latest"
-            else -> artifact.releaseVersion
-        }
+        val version = artifact.releaseVersion
+        val repositoryURL = artifact.repo.replace("/", "%2F")
 
-        val response = CachedRequest(
+        val request = CachedRequest(
             targetDir / "response-${artifact.repo.replace("/", "-")}-$version",
-            expiration = config.cacheExpirationTime.takeIf { version == "latest" }
-        ) {
-            val response = client.get {
-                timeout {
-                    requestTimeoutMillis = 30.seconds.inWholeMilliseconds
+            expiration = config.cacheExpirationTime.takeIf { version == "latest" },
+            evaluate = {
+                val response = client.get {
+                    timeout {
+                        requestTimeoutMillis = 30.seconds.inWholeMilliseconds
+                    }
+                    if (version == "latest")
+                        url("https://gitlab.com/api/v4/projects/$repositoryURL/releases")
+                    else {
+                        val releaseURL = artifact.releaseVersion.replace("/", "%2F")
+                        url("https://gitlab.com/api/v4/projects/$repositoryURL/releases/$releaseURL")
+                    }
+                    headers {
+                        if (config.gitlabAccessToken != null)
+                            append("PRIVATE-TOKEN", config.gitlabAccessToken)
+                    }
                 }
-                if (config.overrideGithubRelease == LATEST)
-                    url("https://api.github.com/repos/${artifact.repo}/releases")
-                else {
-                    val releaseURL = if (version == "latest") "latest" else "tags/${artifact.releaseVersion}"
-                    url("https://api.github.com/repos/${artifact.repo}/releases/$releaseURL")
-                }
-                headers {
-                    if (config.githubAuthToken != null)
-                        append(HttpHeaders.Authorization, "token ${config.githubAuthToken}")
-                }
-            }
-            if (response.status != HttpStatusCode.OK) {
-                return@CachedRequest Result.failure(RuntimeException("GET responded with error: ${response.status}, ${response.bodyAsText()}"))
-            }
 
-            Result.success(response.bodyAsText())
-        }.getFromCacheOrEval().getOrElse {
+                if (response.status != HttpStatusCode.OK) {
+                    Result.failure(RuntimeException("GET responded with error: ${response.status}, ${response.bodyAsText()}"))
+                } else {
+                    Result.success(response.bodyAsText())
+                }
+            }
+        )
+
+        val response = request.getFromCacheOrEval().getOrElse {
             return listOf(DownloadResult.Failure(it.message ?: "", artifact.source.keyInConfig))
         }
 
         val body = response.result
 
-        val release: GithubRelease = runCatching {
-            if (config.overrideGithubRelease == LATEST) {
-                json.decodeFromString(ListSerializer(GithubRelease.serializer()), body)
-                    .maxBy { it.published_at }
-            } else json.decodeFromString(GithubRelease.serializer(), body)
+        val release: GitlabRelease = runCatching {
+            if (version == "latest") {
+                json.decodeFromString(ListSerializer(GitlabRelease.serializer()), body).maxBy { it.released_at }
+            } else {
+                json.decodeFromString(GitlabRelease.serializer(), body)
+            }
         }.getOrElse {
             return listOf(
                 DownloadResult.Failure(
@@ -107,11 +110,12 @@ class GithubDownload(
         val fullName = TextColors.yellow(artifact.source.keyInConfig)
 
         if (!response.wasCached) {
-            t.println("${MSG.github} $fullName ${TextColors.gray("GET artifact URLs")}")
+            t.println("${MSG.gitlab} $fullName ${TextColors.gray("GET artifact URLs")}")
         }
 
         return coroutineScope {
             release.assets
+                .links
                 .filter { it.name.contains(artifact.calculatedRegex) }
                 .map {
                     async {
@@ -122,8 +126,8 @@ class GithubDownload(
                             fileName = it.name,
                             transformHeader = {
                                 header(HttpHeaders.Accept, "application/octet-stream")
-                                if (config.githubAuthToken != null)
-                                    header(HttpHeaders.Authorization, "Bearer ${config.githubAuthToken}")
+                                if (config.gitlabAccessToken != null)
+                                    header("PRIVATE-TOKEN", config.gitlabAccessToken)
                             }
                         ).download()
                     }

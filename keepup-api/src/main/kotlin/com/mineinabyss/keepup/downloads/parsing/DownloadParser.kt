@@ -2,13 +2,15 @@ package com.mineinabyss.keepup.downloads.parsing
 
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.Downloader
-import com.mineinabyss.keepup.downloads.github.GithubArtifact
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubDownload
+import com.mineinabyss.keepup.downloads.gitlab.GitlabConfig
+import com.mineinabyss.keepup.downloads.gitlab.GitlabDownload
 import com.mineinabyss.keepup.downloads.http.HttpDownloader
 import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import com.mineinabyss.keepup.downloads.nexus.NexusDownload
 import com.mineinabyss.keepup.downloads.rclone.RcloneDownloader
+import com.mineinabyss.keepup.helpers.RepositoryArtifact
 import com.mineinabyss.keepup.similarfiles.SimilarFileChecker
 import com.mineinabyss.keepup.type_checker.FileTypeChecker
 import io.ktor.client.*
@@ -21,6 +23,7 @@ class DownloadParser(
     val failAllDownloads: Boolean,
     val client: HttpClient,
     val githubConfig: GithubConfig,
+    val gitlabConfig: GitlabConfig,
     val nexusConfig: NexusConfig,
     val similarFileChecker: SimilarFileChecker?,
 ) {
@@ -45,7 +48,13 @@ class DownloadParser(
             source.query.startsWith("github:") -> GithubDownload(
                 client = client,
                 config = githubConfig,
-                artifact = GithubArtifact.from(source),
+                artifact = RepositoryArtifact.from("github:", source),
+                targetDir = targetDir,
+            )
+            source.query.startsWith("gitlab:") -> GitlabDownload(
+                client = client,
+                config = gitlabConfig,
+                artifact = RepositoryArtifact.from("gitlab:", source),
                 targetDir = targetDir,
             )
             source.query.startsWith("nexus:")    -> NexusDownload(client, nexusConfig, source, targetDir)
