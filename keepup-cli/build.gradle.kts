@@ -48,6 +48,7 @@ graalvmNative {
         named("main") {
             fallback.set(false)
             verbose.set(false)
+            mainClass.set("com.mineinabyss.keepup.cli.MainKt")
 
             buildArgs.addAll("--initialize-at-build-time", "-Os")
             imageName.set("keepup")
