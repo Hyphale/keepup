@@ -17,26 +17,55 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.io.InputStream
+import java.nio.file.Path
+import kotlin.io.path.*
 
 @Serializable(with = Inventory.Serializer::class)
 class Inventory(
     val configs: Map<String, ConfigDefinition>,
 ) {
-    fun getOrCreateConfigs(host: String): List<ConfigDefinition> {
+    fun getOrCreateConfigs(host: String, configsRoot: Path? = null): List<ConfigDefinition> {
         val global = configs["global"]
-        val includes = getDeepIncludes(names = listOf(host)).distinct().reversed()
+        val includes = getDeepIncludes(names = listOf(host), configsRoot = configsRoot).distinct().reversed()
         return listOfNotNull(global) + includes.map {
-            configs[it] ?: ConfigDefinition(copyPaths = listOf(CopyPath(source = it)))
+            configs[it] ?: getConfigFromDirectory(it, configsRoot) ?: ConfigDefinition(copyPaths = listOf(CopyPath(source = it)))
         }
     }
 
-    tailrec fun getDeepIncludes(acc: MutableList<String> = mutableListOf(), names: List<String>): List<String> {
+    tailrec fun getDeepIncludes(acc: MutableList<String> = mutableListOf(), names: List<String>, configsRoot: Path? = null): List<String> {
         if (names.isEmpty()) return acc
         val namesSet = names.toSet()
         val nonCyclicNames = names - acc.filter { it in namesSet }.toSet()
         acc.addAll(nonCyclicNames)
-        val newNames = nonCyclicNames.flatMap { configs[it]?.include?.reversed() ?: emptyList() }
-        return getDeepIncludes(acc, newNames)
+        val newNames = nonCyclicNames.flatMap { 
+            val config = configs[it] ?: getConfigFromDirectory(it, configsRoot)
+            config?.include?.reversed() ?: emptyList()
+        }
+        return getDeepIncludes(acc, newNames, configsRoot)
+    }
+
+    private fun getConfigFromDirectory(name: String, configsRoot: Path?): ConfigDefinition? {
+        if (configsRoot == null) return null
+        
+        val directoryPath = configsRoot / name
+        if (!directoryPath.isDirectory()) return null
+        
+        val includeFile = directoryPath / "include.yml"
+        if (!includeFile.exists()) return null
+        
+        return try {
+            t.println("${MSG.info} Loading config from directory: $directoryPath")
+            val templater = Templater()
+            Yaml.default.decodeFromString<ConfigDefinition>(
+                templater.template(
+                    includeFile.readText(),
+                    mapOf<String, Any?>()
+                ).getOrThrow()
+            )
+        } catch (e: Exception) {
+            t.println("${MSG.error} Failed to parse include.yml in $directoryPath: ${e.message}")
+            null
+        }
     }
 
     object Serializer : InnerSerializer<Map<String, ConfigDefinition>, Inventory>(

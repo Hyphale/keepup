@@ -33,7 +33,7 @@ class KeepupConfigSync(
             t.println("${MSG.error} Config not found: $host")
             return
         })
-        val included = inventory.getOrCreateConfigs(host)
+        val included = inventory.getOrCreateConfigs(host, configsRoot)
         val reduced = ConfigDefinition.reduce(included)
 
         t.println("${MSG.info} Included paths: ${reduced.copyPaths}")

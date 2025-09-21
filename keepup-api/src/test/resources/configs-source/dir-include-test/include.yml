@@ -1,0 +1,10 @@
+copyPaths:
+  - source: should-correctly-set-dest
+    dest: dir-included/example
+  - should-correctly-default-dest
+
+variables:
+  fromDirInclude: "directory-value"
+
+include:
+  - feat/example
