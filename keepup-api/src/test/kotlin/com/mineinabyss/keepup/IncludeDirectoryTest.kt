@@ -20,9 +20,10 @@ class IncludeDirectoryTest {
         val templater = Templater()
 
         val inventory = Inventory.from(
-            templater, 
-            inventoryFile.inputStream(), 
-            environment = mapOf("TEST_VAR" to "world")
+            templater = templater, 
+            inputStream = inventoryFile.inputStream(), 
+            environment = mapOf("TEST_VAR" to "world"),
+            enableDockerSecrets = false // Disable for test consistency
         )
         
         // Test that directory-based includes are loaded correctly
@@ -47,15 +48,15 @@ class IncludeDirectoryTest {
     
     @Test
     fun `should handle mixed named and directory includes`() {
-        val keepup = Keepup()
         val templater = Templater()
         val inventoryFile = Path("src/test/resources/inventory-with-dir-includes.yml")
         val configsRoot = Path("src/test/resources/configs-source")
 
         val inventory = Inventory.from(
-            templater,
-            inventoryFile.inputStream(),
-            environment = mapOf("TEST_VAR" to "world")
+            templater = templater,
+            inputStream = inventoryFile.inputStream(),
+            environment = mapOf("TEST_VAR" to "world"),
+            enableDockerSecrets = false
         )
 
         val configs = inventory.getOrCreateConfigs("mixed-include-host", configsRoot)
@@ -73,15 +74,15 @@ class IncludeDirectoryTest {
     
     @Test
     fun `should fall back to source path when directory has no include yml`() {
-        val keepup = Keepup()
         val templater = Templater()
         val inventoryFile = Path("src/test/resources/inventory-with-dir-includes.yml")
         val configsRoot = Path("src/test/resources/configs-source")
 
         val inventory = Inventory.from(
-            templater,
-            inventoryFile.inputStream(),
-            environment = mapOf("TEST_VAR" to "world")
+            templater = templater,
+            inputStream = inventoryFile.inputStream(),
+            environment = mapOf("TEST_VAR" to "world"),
+            enableDockerSecrets = false
         )
 
         val configs = inventory.getOrCreateConfigs("mixed-include-host", configsRoot)
@@ -104,9 +105,10 @@ class IncludeDirectoryTest {
 
         keepup.configSync(
             inventory = Inventory.from(
-                templater, 
-                inventoryFile.inputStream(), 
-                environment = mapOf("TEST_VAR" to "world")
+                templater = templater, 
+                inputStream = inventoryFile.inputStream(), 
+                environment = mapOf("TEST_VAR" to "world"),
+                enableDockerSecrets = false
             ),
         ).sync(
             host = "dir-include-host",

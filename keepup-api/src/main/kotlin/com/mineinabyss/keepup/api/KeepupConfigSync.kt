@@ -6,6 +6,7 @@ import com.mineinabyss.keepup.config_sync.ConfigDefinition
 import com.mineinabyss.keepup.config_sync.ConfigTreeBuilder
 import com.mineinabyss.keepup.config_sync.Inventory
 import com.mineinabyss.keepup.config_sync.templating.Templater
+import com.mineinabyss.keepup.helpers.DockerSecrets
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.t
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,12 @@ class KeepupConfigSync(
         val included = inventory.getOrCreateConfigs(host, configsRoot)
         val reduced = ConfigDefinition.reduce(included)
 
+        val dockerSecrets = DockerSecrets.readSecrets(enableLogging = false)
+        val templateVariables = System.getenv().toMutableMap<String, Any?>().apply {
+            putAll(dockerSecrets)
+            putAll(reduced.variables)
+        }
+
         t.println("${MSG.info} Included paths: ${reduced.copyPaths}")
         val tree = ConfigTreeBuilder()
         val destToSource = tree.destFilesForRoots(configsRoot, reduced.copyPaths)
@@ -64,14 +71,14 @@ class KeepupConfigSync(
                         val sourceForSkipComparison = if (isTemplate) {
                             val cacheFile = templateCacheDir /
                                     (dest.parent ?: Path("")) /
-                                    "${hashString(reduced.variables.toString() + "len: ${source.fileSize()}").toHexString()}-${dest.name}"
+                                    "${hashString(templateVariables.toString() + "len: ${source.fileSize()}").toHexString()}-${dest.name}"
 
                             // Create template cache if necessary
                             // cacheFile name encodes file size so another check isn't necessary
                             if (cacheFile.notExists() || cacheFile.getLastModifiedTime() != sourceModified) {
                                 val output = templater.template(
                                     source.inputStream().bufferedReader().readText(),
-                                    reduced.variables
+                                    templateVariables
                                 ).getOrElse {
                                     t.println("${MSG.error} Failed to template $source")
                                     t.println("${it.message ?: it::class.simpleName}")

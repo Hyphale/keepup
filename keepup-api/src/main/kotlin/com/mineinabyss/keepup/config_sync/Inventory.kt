@@ -5,6 +5,7 @@ import com.charleskorn.kaml.YamlContentPolymorphicSerializer
 import com.charleskorn.kaml.YamlNode
 import com.charleskorn.kaml.YamlScalar
 import com.mineinabyss.keepup.config_sync.templating.Templater
+import com.mineinabyss.keepup.helpers.DockerSecrets
 import com.mineinabyss.keepup.helpers.InnerSerializer
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.t
@@ -56,10 +57,16 @@ class Inventory(
         return try {
             t.println("${MSG.info} Loading config from directory: $directoryPath")
             val templater = Templater()
+            
+            val dockerSecrets = DockerSecrets.readSecrets(enableLogging = false)
+            val environment = System.getenv().toMutableMap<String, Any?>().apply {
+                putAll(dockerSecrets)
+            }
+            
             Yaml.default.decodeFromString<ConfigDefinition>(
                 templater.template(
                     includeFile.readText(),
-                    mapOf<String, Any?>()
+                    environment
                 ).getOrThrow()
             )
         } catch (e: Exception) {
@@ -80,11 +87,26 @@ class Inventory(
             templater: Templater,
             inputStream: InputStream,
             environment: Map<String, String> = System.getenv().toMap(),
+            enableDockerSecrets: Boolean = true,
+            dockerSecretsPath: Path? = null,
         ): Inventory {
             t.println("${MSG.info} Parsing inventory file")
+            
+            val combinedEnvironment = if (enableDockerSecrets) {
+                val dockerSecrets = DockerSecrets.readSecrets(
+                    secretsPath = dockerSecretsPath ?: Path("/run/secrets"),
+                    enableLogging = true
+                )
+                environment.toMutableMap<String, Any?>().apply {
+                    putAll(dockerSecrets)
+                }
+            } else {
+                environment
+            }
+            
             val templatedText = templater.template(
                 inputStream.bufferedReader().readText(),
-                environment
+                combinedEnvironment
             ).getOrElse {
                 t.println("${MSG.error} Failed to template inventory file!")
                 throw it

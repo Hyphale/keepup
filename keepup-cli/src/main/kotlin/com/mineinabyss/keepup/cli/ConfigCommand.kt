@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.defaultLazy
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
@@ -47,12 +48,29 @@ class ConfigCommand : CliktCommand(name = "config") {
     )
         .path(mustExist = false, canBeFile = false)
 
+    val disableDockerSecrets by option(
+        "--disable-docker-secrets",
+        help = "Disable reading Docker Swarm secrets from the filesystem"
+    )
+        .flag(default = false)
+
+    val dockerSecretsPath by option(
+        "--docker-secrets-path",
+        help = "Custom path to Docker secrets directory (default: /run/secrets)"
+    )
+        .path(mustExist = false, canBeFile = false, mustBeReadable = true)
+
     override fun run() {
         t.println("${MSG.info} Running config sync for $include...")
         val keepup = Keepup()
         val templater = Templater()
         keepup.configSync(
-            inventory = Inventory.from(templater, inventoryFile.inputStream())
+            inventory = Inventory.from(
+                templater = templater,
+                inputStream = inventoryFile.inputStream(),
+                enableDockerSecrets = !disableDockerSecrets,
+                dockerSecretsPath = dockerSecretsPath
+            )
         ).sync(
             host = include,
             configsRoot = sourceRoot,

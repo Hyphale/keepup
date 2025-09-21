@@ -19,7 +19,12 @@ class ConfigCopyTest {
         val templater = Templater()
 
         keepup.configSync(
-            inventory = Inventory.from(templater, inventoryFile.inputStream(), environment = mapOf("TEST_VAR" to "world")),
+            inventory = Inventory.from(
+                templater = templater, 
+                inputStream = inventoryFile.inputStream(), 
+                environment = mapOf("TEST_VAR" to "world"),
+                enableDockerSecrets = false // Disable for test consistency
+            ),
         ).sync(
             host = "example-host",
             configsRoot = configsRoot,
