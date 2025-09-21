@@ -1,0 +1,53 @@
+feat/example:
+  copyPaths:
+    - source: should-correctly-set-dest
+      dest: plugins/example
+    - should-correctly-default-dest
+    - should-template-inventory-with-env
+    - source: should-copy-individual-files/copy-individual
+      dest: plugins/example
+
+example-host:
+  variables:
+    testVar: "{{ TEST_VAR }}"
+
+  include:
+    - feat/example
+
+# Test host for alias support
+alias-test-host:
+  variables:
+    testVar: "{{ TEST_VAR }}"
+
+  include:
+    - feature-alias-test
+    - server-alias-test  
+    - event-alias-test
+
+# Test host for relative path resolution
+relative-path-host:
+  variables:
+    testVar: "{{ TEST_VAR }}"
+
+  include:
+    - relative-path-test
+
+# Test host that includes directory-based configs
+dir-include-host:
+  variables:
+    testVar: "{{ TEST_VAR }}"
+    hostSpecific: "host-value"
+
+  include:
+    - dir-include-test
+    - another-dir-include
+
+# Test host that includes both named configs and directory-based configs  
+mixed-include-host:
+  variables:
+    testVar: "{{ TEST_VAR }}"
+
+  include:
+    - feat/example
+    - dir-include-test
+    - non-existent-fallback-to-directory

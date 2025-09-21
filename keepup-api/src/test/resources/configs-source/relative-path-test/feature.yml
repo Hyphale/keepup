@@ -1,0 +1,7 @@
+copyPaths:
+  - source: local-config/config.yml
+    dest: output/config
+  - local-data
+
+variables:
+  localVar: "from-relative-test"

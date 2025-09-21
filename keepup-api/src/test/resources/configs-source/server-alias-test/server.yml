@@ -1,0 +1,7 @@
+copyPaths:
+  - source: server-config
+    dest: server/config
+  - server-logs
+
+variables:
+  serverPort: 8080

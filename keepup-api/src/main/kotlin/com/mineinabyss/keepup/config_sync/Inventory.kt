@@ -33,6 +33,21 @@ class Inventory(
         }
     }
 
+    fun getOrCreateConfigsWithBasePaths(host: String, configsRoot: Path? = null): List<Pair<ConfigDefinition, Path?>> {
+        val global = configs["global"]?.let { it to null }
+        val includes = getDeepIncludes(names = listOf(host), configsRoot = configsRoot).distinct().reversed()
+        val includeConfigs = includes.map {
+            val fromDirectory = getConfigFromDirectory(it, configsRoot)
+            if (fromDirectory != null) {
+                fromDirectory to (configsRoot?.resolve(it))
+            } else {
+                val fallback = configs[it] ?: ConfigDefinition(copyPaths = listOf(CopyPath(source = it)))
+                fallback to null
+            }
+        }
+        return listOfNotNull(global) + includeConfigs
+    }
+
     tailrec fun getDeepIncludes(acc: MutableList<String> = mutableListOf(), names: List<String>, configsRoot: Path? = null): List<String> {
         if (names.isEmpty()) return acc
         val namesSet = names.toSet()
@@ -51,11 +66,15 @@ class Inventory(
         val directoryPath = configsRoot / name
         if (!directoryPath.isDirectory()) return null
         
-        val includeFile = directoryPath / "include.yml"
-        if (!includeFile.exists()) return null
+        // Support multiple include file aliases
+        val includeFileNames = listOf("include.yml", "feature.yml", "server.yml", "event.yml")
+        val includeFile = includeFileNames
+            .map { directoryPath / it }
+            .firstOrNull { it.exists() }
+            ?: return null
         
         return try {
-            t.println("${MSG.info} Loading config from directory: $directoryPath")
+            t.println("${MSG.info} Loading config from directory: $directoryPath (using ${includeFile.fileName})")
             val templater = Templater()
             
             val dockerSecrets = DockerSecrets.readSecrets(enableLogging = false)
@@ -70,7 +89,7 @@ class Inventory(
                 ).getOrThrow()
             )
         } catch (e: Exception) {
-            t.println("${MSG.error} Failed to parse include.yml in $directoryPath: ${e.message}")
+            t.println("${MSG.error} Failed to parse ${includeFile.fileName} in $directoryPath: ${e.message}")
             null
         }
     }

@@ -1,0 +1,7 @@
+copyPaths:
+  - source: event-handlers
+    dest: events/handlers
+  - event-config
+
+variables:
+  eventTimeout: 30

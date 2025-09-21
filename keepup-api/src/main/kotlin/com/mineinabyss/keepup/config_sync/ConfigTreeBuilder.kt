@@ -34,6 +34,35 @@ class ConfigTreeBuilder {
         return destToSource
     }
 
+    fun destFilesForConfigsWithBasePaths(
+        configsRoot: Path,
+        configsWithBasePaths: List<Pair<ConfigDefinition, Path?>>
+    ): Map<Path, Path> {
+        val destToSource = mutableMapOf<Path, Path>()
+        
+        configsWithBasePaths.forEach { (config, basePath) ->
+            config.copyPaths.forEach { copyPath ->
+                val effectiveRoot = basePath ?: configsRoot
+                val sourceRoot = effectiveRoot / copyPath.source
+                val destOffset = Path(copyPath.dest)
+                when {
+                    sourceRoot.isRegularFile() -> {
+                        val dest = destOffset / sourceRoot.fileName
+                        destToSource[dest] = sourceRoot
+                    }
+                    sourceRoot.isDirectory() -> sourceRoot.walk(PathWalkOption.INCLUDE_DIRECTORIES)
+                        .filter { it.isRegularFile() }
+                        .forEach { source ->
+                            val dest = destOffset / source.relativeTo(sourceRoot)
+                            destToSource[dest] = source
+                        }
+                    else -> t.println("${MSG.warn} Included path $sourceRoot does not exist.")
+                }
+            }
+        }
+        return destToSource
+    }
+
     fun onUntracked(
         root: Path,
         deleteUnder: Path,
