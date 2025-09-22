@@ -1,7 +1,0 @@
-copyPaths:
-  - source: feature-specific-file
-    dest: features/example
-  - another-feature-file
-
-variables:
-  featureVar: "feature-value"

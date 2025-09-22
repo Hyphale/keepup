@@ -13,3 +13,4 @@ example-host:
 
   include:
     - feat/example
+    - should-copy-feature

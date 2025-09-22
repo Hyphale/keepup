@@ -1,6 +1,0 @@
-copyPaths:
-  - source: should-template-inventory-with-env
-    dest: another-dir/template
-
-variables:
-  anotherVar: "another-value"

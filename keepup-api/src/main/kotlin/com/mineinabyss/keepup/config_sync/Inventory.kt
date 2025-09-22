@@ -33,27 +33,12 @@ class Inventory(
         }
     }
 
-    fun getOrCreateConfigsWithBasePaths(host: String, configsRoot: Path? = null): List<Pair<ConfigDefinition, Path?>> {
-        val global = configs["global"]?.let { it to null }
-        val includes = getDeepIncludes(names = listOf(host), configsRoot = configsRoot).distinct().reversed()
-        val includeConfigs = includes.map {
-            val fromDirectory = getConfigFromDirectory(it, configsRoot)
-            if (fromDirectory != null) {
-                fromDirectory to (configsRoot?.resolve(it))
-            } else {
-                val fallback = configs[it] ?: ConfigDefinition(copyPaths = listOf(CopyPath(source = it)))
-                fallback to null
-            }
-        }
-        return listOfNotNull(global) + includeConfigs
-    }
-
     tailrec fun getDeepIncludes(acc: MutableList<String> = mutableListOf(), names: List<String>, configsRoot: Path? = null): List<String> {
         if (names.isEmpty()) return acc
         val namesSet = names.toSet()
         val nonCyclicNames = names - acc.filter { it in namesSet }.toSet()
         acc.addAll(nonCyclicNames)
-        val newNames = nonCyclicNames.flatMap { 
+        val newNames = nonCyclicNames.flatMap {
             val config = configs[it] ?: getConfigFromDirectory(it, configsRoot)
             config?.include?.reversed() ?: emptyList()
         }
@@ -62,31 +47,45 @@ class Inventory(
 
     private fun getConfigFromDirectory(name: String, configsRoot: Path?): ConfigDefinition? {
         if (configsRoot == null) return null
-        
-        val directoryPath = configsRoot / name
-        if (!directoryPath.isDirectory()) return null
-        
-        // Support multiple include file aliases
+
+        val directoryPath = (configsRoot / name)
+            .takeIf { it.isDirectory() } ?: return null
+
         val includeFileNames = listOf("include.yml", "feature.yml", "server.yml", "event.yml")
         val includeFile = includeFileNames
             .map { directoryPath / it }
             .firstOrNull { it.exists() }
             ?: return null
-        
+
         return try {
             t.println("${MSG.info} Loading config from directory: $directoryPath (using ${includeFile.fileName})")
             val templater = Templater()
-            
+
             val dockerSecrets = DockerSecrets.readSecrets(enableLogging = false)
             val environment = System.getenv().toMutableMap<String, Any?>().apply {
                 putAll(dockerSecrets)
             }
-            
-            Yaml.default.decodeFromString<ConfigDefinition>(
+
+            val config = Yaml.default.decodeFromString<ConfigDefinition>(
                 templater.template(
                     includeFile.readText(),
                     environment
                 ).getOrThrow()
+            )
+
+            ConfigDefinition(
+                copyPaths = config.copyPaths.map {
+                    it.copy(
+                        source = if (it.source.startsWith("/")) {
+                            it.source
+                        } else {
+                            "$name/${it.source}"
+                        }
+                    )
+                },
+                files = config.files,
+                include = config.include,
+                variables = config.variables,
             )
         } catch (e: Exception) {
             t.println("${MSG.error} Failed to parse ${includeFile.fileName} in $directoryPath: ${e.message}")
@@ -110,7 +109,7 @@ class Inventory(
             dockerSecretsPath: Path? = null,
         ): Inventory {
             t.println("${MSG.info} Parsing inventory file")
-            
+
             val combinedEnvironment = if (enableDockerSecrets) {
                 val dockerSecrets = DockerSecrets.readSecrets(
                     secretsPath = dockerSecretsPath ?: Path("/run/secrets"),
@@ -122,7 +121,7 @@ class Inventory(
             } else {
                 environment
             }
-            
+
             val templatedText = templater.template(
                 inputStream.bufferedReader().readText(),
                 combinedEnvironment
