@@ -51,8 +51,17 @@ class PluginsCommand : CliktCommand(name = "plugins") {
 
     val include by argument("include", help = "The config defined in inventory to sync")
 
+    val downloadPath by argument(help = "Path to download files to")
+        .path(mustExist = true, canBeFile = false, mustBeWritable = true)
+
+    val dest by argument()
+        .path(mustExist = true, canBeFile = false, mustBeWritable = true)
+
     // === Arguments ===
-    val catalog by argument(help = "Path to the version catalog file").inputStream()
+    val catalog by option(
+        "--catalog",
+        help = "Path to the version catalog file",
+    ).path().required()
 
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
         .path(mustExist = true, canBeDir = false, mustBeReadable = true)
@@ -66,11 +75,6 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         .path(mustExist = true, canBeFile = false, mustBeReadable = true)
         .defaultLazy { inventoryFiles[0].parent }
 
-    val downloadPath by argument(help = "Path to download files to")
-        .path(mustExist = true, canBeFile = false, mustBeWritable = true)
-
-    val dest by argument()
-        .path(mustExist = true, canBeFile = false, mustBeWritable = true)
 
     // === Options ===
 
@@ -142,7 +146,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
             nexusConfig = nexusConfig,
         )
 
-        keepup.catalogParser().parse(catalog).also {
+        keepup.catalogParser().parse(catalog.inputStream()).also {
             t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
         }
 
