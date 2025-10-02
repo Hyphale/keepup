@@ -73,8 +73,6 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         .path(mustExist = true, canBeFile = false, mustBeWritable = true)
 
     // === Options ===
-    val jsonPath by option(help = "Path to the root object to download from, uses keys separated by .")
-        .default("$")
 
     val ignoreSimilar by option(help = "Don't create symlinks for files with matching characters before the first number")
         .flag(default = true)
@@ -163,8 +161,8 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         clearSymlinks(dest)
 
         t.println(
-            "${MSG.info} Running Keepup on ${TextColors.yellow(sources.size.toString())} items" + if (jsonPath != "$") " from path ${
-                TextColors.yellow(jsonPath)
+            "${MSG.info} Running Keepup on ${TextColors.yellow(sources.size.toString())} items" + if (include != "$") " from path ${
+                TextColors.yellow(include)
             }" else ""
         )
 
