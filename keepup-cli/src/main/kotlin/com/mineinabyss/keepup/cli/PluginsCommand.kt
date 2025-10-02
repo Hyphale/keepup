@@ -4,10 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.convert
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.inputStream
 import com.github.ajalt.clikt.parameters.types.path
@@ -16,7 +13,12 @@ import com.github.ajalt.mordant.animation.progress.animateOnThread
 import com.github.ajalt.mordant.animation.progress.execute
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.widgets.progress.*
-import com.mineinabyss.keepup.api.*
+import com.mineinabyss.keepup.api.Keepup
+import com.mineinabyss.keepup.api.KeepupDownloaderConfig
+import com.mineinabyss.keepup.api.KeepupVersionCatalog
+import com.mineinabyss.keepup.config_sync.ConfigDefinition
+import com.mineinabyss.keepup.config_sync.Inventory
+import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride
@@ -28,6 +30,11 @@ import com.mineinabyss.keepup.helpers.linkToDest
 import com.mineinabyss.keepup.helpers.printToConsole
 import com.mineinabyss.keepup.t
 import kotlinx.coroutines.runBlocking
+import java.io.InputStream
+import java.io.SequenceInputStream
+import java.nio.file.Path
+import java.util.Collections
+import kotlin.io.path.inputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.DurationUnit
@@ -42,8 +49,22 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         }
     }
 
+    val include by argument("include", help = "The config defined in inventory to sync")
+
     // === Arguments ===
     val catalog by argument(help = "Path to the version catalog file").inputStream()
+
+    val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
+        .path(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .multiple(required = true)
+
+    val sourceRoot by option(
+        "-s",
+        "--source",
+        help = "Directory containing source configs to sync, defaults to directory of inventory"
+    )
+        .path(mustExist = true, canBeFile = false, mustBeReadable = true)
+        .defaultLazy { inventoryFiles[0].parent }
 
     val downloadPath by argument(help = "Path to download files to")
         .path(mustExist = true, canBeFile = false, mustBeWritable = true)
@@ -54,10 +75,6 @@ class PluginsCommand : CliktCommand(name = "plugins") {
     // === Options ===
     val jsonPath by option(help = "Path to the root object to download from, uses keys separated by .")
         .default("$")
-
-    val fileType by option(help = "Type of file for the input stream")
-        .enum<VersionCatalogType>()
-        .default(VersionCatalogType.HOCON)
 
     val ignoreSimilar by option(help = "Don't create symlinks for files with matching characters before the first number")
         .flag(default = true)
@@ -126,15 +143,21 @@ class PluginsCommand : CliktCommand(name = "plugins") {
             gitlabConfig = gitlabConfig,
             nexusConfig = nexusConfig,
         )
-        val parser = keepup.catalogParser()
 
-        val sources = parser.parse(
-            catalog = KeepupVersionCatalog(
-                inputStream = catalog,
-                type = fileType,
-                include = JsonPath(jsonPath),
-            ),
+        keepup.catalogParser().parse(catalog).also {
+            t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
+        }
+
+        val inventory = Inventory.from(
+            templater = Templater(),
+            inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.map { it.inputStream() })),
+            enableDockerSecrets = false,
         )
+
+        val included = inventory.getOrCreateConfigs(include, sourceRoot)
+        val reduced = ConfigDefinition.reduce(included)
+        val sources = reduced.plugins.toMutableList()
+        sources.removeIf { reduced.excludePlugins.contains(it.keyInConfig)}
 
         t.println("${MSG.info} Clearing symlinks")
         clearSymlinks(dest)

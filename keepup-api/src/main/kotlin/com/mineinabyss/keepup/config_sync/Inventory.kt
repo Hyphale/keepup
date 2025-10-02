@@ -5,6 +5,7 @@ import com.charleskorn.kaml.YamlContentPolymorphicSerializer
 import com.charleskorn.kaml.YamlNode
 import com.charleskorn.kaml.YamlScalar
 import com.mineinabyss.keepup.config_sync.templating.Templater
+import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.helpers.DockerSecrets
 import com.mineinabyss.keepup.helpers.InnerSerializer
 import com.mineinabyss.keepup.helpers.MSG
@@ -171,6 +172,8 @@ data class ConfigDefinition(
     val include: List<String> = listOf(),
     @Serializable(with = VariablesSerializer::class)
     val variables: Map<String, @Contextual Any?> = mapOf(),
+    val plugins: List<DownloadSource> = listOf(),
+    val excludePlugins: List<String> = listOf(), // TODO: this is not really implemented, and only works at the top level
 ) {
     companion object {
         fun reduce(configs: List<ConfigDefinition>) =
@@ -178,7 +181,9 @@ data class ConfigDefinition(
                 acc.copy(
                     copyPaths = acc.copyPaths + config.copyPaths,
                     files = acc.files + config.files,
-                    variables = mergeVariables(acc.variables, config.variables)
+                    variables = mergeVariables(acc.variables, config.variables),
+                    plugins = acc.plugins + config.plugins,
+                    excludePlugins = acc.excludePlugins + config.excludePlugins,
                 )
             }
 

@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.defaultLazy
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
@@ -13,6 +14,8 @@ import com.mineinabyss.keepup.config_sync.Inventory
 import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.t
+import java.io.SequenceInputStream
+import java.util.Collections
 import kotlin.io.path.inputStream
 
 class ConfigCommand : CliktCommand(name = "config") {
@@ -23,12 +26,9 @@ class ConfigCommand : CliktCommand(name = "config") {
         help = "The config defined in inventory to sync"
     )
 
-    val inventoryFile by option(
-        "-i", "--inventory",
-        help = "Inventory file defining config options"
-    )
+    val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
         .path(mustExist = true, canBeDir = false, mustBeReadable = true)
-        .required()
+        .multiple(required = true)
 
     val sourceRoot by option(
         "-s",
@@ -36,7 +36,7 @@ class ConfigCommand : CliktCommand(name = "config") {
         help = "Directory containing source configs to sync, defaults to directory of inventory"
     )
         .path(mustExist = true, canBeFile = false, mustBeReadable = true)
-        .defaultLazy { inventoryFile.parent }
+        .defaultLazy { inventoryFiles[0].parent }
 
     val destRoot by option("-d", "--dest", help = "Directory to sync configs to")
         .path(mustExist = true, canBeFile = false, mustBeWritable = true)
@@ -67,7 +67,7 @@ class ConfigCommand : CliktCommand(name = "config") {
         keepup.configSync(
             inventory = Inventory.from(
                 templater = templater,
-                inputStream = inventoryFile.inputStream(),
+                inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.map { it.inputStream() })),
                 enableDockerSecrets = !disableDockerSecrets,
                 dockerSecretsPath = dockerSecretsPath
             )
