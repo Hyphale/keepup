@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
 import com.mineinabyss.keepup.api.Keepup
+import com.mineinabyss.keepup.api.KeepupVersionCatalog
 import com.mineinabyss.keepup.config_sync.Inventory
 import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.helpers.MSG
@@ -29,6 +30,10 @@ class ConfigCommand : CliktCommand(name = "config") {
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
         .path(mustExist = true, canBeDir = false, mustBeReadable = true)
         .multiple(required = true)
+
+    val catalogFile by option("--catalog", help = "Path to the version catalog file")
+        .path(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .required()
 
     val sourceRoot by option(
         "-s",
@@ -64,6 +69,11 @@ class ConfigCommand : CliktCommand(name = "config") {
         t.println("${MSG.info} Running config sync for $include...")
         val keepup = Keepup()
         val templater = Templater()
+
+        keepup.catalogParser().parse(catalogFile.inputStream()).also {
+            t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
+        }
+
         keepup.configSync(
             inventory = Inventory.from(
                 templater = templater,
