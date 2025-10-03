@@ -74,7 +74,7 @@ class Inventory(
                 ).getOrThrow()
             )
 
-            ConfigDefinition(
+            config.copy(
                 copyPaths = config.copyPaths.map {
                     it.copy(
                         source = if (it.source.startsWith("/")) {
@@ -84,9 +84,6 @@ class Inventory(
                         }
                     )
                 },
-                files = config.files,
-                include = config.include,
-                variables = config.variables,
             )
         } catch (e: Exception) {
             t.println("${MSG.error} Failed to parse ${includeFile.fileName} in $directoryPath: ${e.message}")
