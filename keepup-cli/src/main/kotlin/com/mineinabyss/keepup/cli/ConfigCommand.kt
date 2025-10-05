@@ -30,7 +30,7 @@ class ConfigCommand : CliktCommand(name = "config") {
     )
 
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
-        .path(mustExist = false, canBeDir = false, mustBeReadable = true)
+        .path(mustExist = false, canBeDir = false)
         .multiple(required = true)
 
     val catalogFile by option("--catalog", help = "Path to the version catalog file")

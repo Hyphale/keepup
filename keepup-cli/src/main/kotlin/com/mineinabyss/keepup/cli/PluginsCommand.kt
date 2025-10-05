@@ -65,7 +65,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
     ).path().required()
 
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
-        .path(mustExist = false, canBeDir = false, mustBeReadable = true)
+        .path(mustExist = false, canBeDir = false)
         .multiple(required = true)
 
     val sourceRoot by option(
