@@ -34,6 +34,7 @@ import java.io.InputStream
 import java.io.SequenceInputStream
 import java.nio.file.Path
 import java.util.Collections
+import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -64,7 +65,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
     ).path().required()
 
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .path(mustExist = false, canBeDir = false, mustBeReadable = true)
         .multiple(required = true)
 
     val sourceRoot by option(
@@ -152,7 +153,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
 
         val inventory = Inventory.from(
             templater = Templater(),
-            inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.map { it.inputStream() })),
+            inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.filter { it.exists() }.map { it.inputStream() })),
             enableDockerSecrets = false,
         )
 

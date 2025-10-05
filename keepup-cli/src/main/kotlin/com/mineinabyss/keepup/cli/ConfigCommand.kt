@@ -16,7 +16,9 @@ import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.t
 import java.io.SequenceInputStream
+import java.nio.file.LinkOption
 import java.util.Collections
+import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 
 class ConfigCommand : CliktCommand(name = "config") {
@@ -28,7 +30,7 @@ class ConfigCommand : CliktCommand(name = "config") {
     )
 
     val inventoryFiles by option("--inventory", help = "Path to the inventory file(s) (can be chained)")
-        .path(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .path(mustExist = false, canBeDir = false, mustBeReadable = true)
         .multiple(required = true)
 
     val catalogFile by option("--catalog", help = "Path to the version catalog file")
@@ -77,7 +79,7 @@ class ConfigCommand : CliktCommand(name = "config") {
         keepup.configSync(
             inventory = Inventory.from(
                 templater = templater,
-                inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.map { it.inputStream() })),
+                inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.filter { it.exists() }.map { it.inputStream() })),
                 enableDockerSecrets = !disableDockerSecrets,
                 dockerSecretsPath = dockerSecretsPath
             )
