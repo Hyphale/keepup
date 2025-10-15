@@ -31,7 +31,7 @@ class ConfigTreeBuilder {
                 else -> t.println("${MSG.warn} Included path $sourceRoot does not exist.")
             }
         }
-        return destToSource
+        return FileBlacklist.filterBlacklisted(destToSource)
     }
 
     fun onUntracked(

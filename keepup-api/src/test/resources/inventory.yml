@@ -14,3 +14,7 @@ example-host:
   include:
     - feat/example
     - should-copy-feature
+
+blacklist-test-host:
+  copyPaths:
+    - should-blacklist-jar-files

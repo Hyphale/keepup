@@ -19,6 +19,7 @@ the config, then creates symlinks to a desired folder.
 - Automatically find the latest release for GitHub artifacts, or force it with `--override-github-release`.
 - Support for GitHub authorization tokens to bypass ratelimits or access private repos.
 - Use any service supported by rclone! (Google Drive, S3, etc...)
+- Automatic file blacklisting to prevent copying certain file types (e.g., `.jar` files during config sync)
 
 ## Usage
 
