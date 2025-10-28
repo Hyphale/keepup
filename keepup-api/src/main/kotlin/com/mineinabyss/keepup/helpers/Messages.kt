@@ -18,6 +18,7 @@ object MSG {
     val cached = brightGreen("[Use Cached]")
     val github = gray("[Github]    ")
     val gitlab = gray("[Gitlab]    ")
+    val keeper = gray("[Keeper]    ")
     val rclone = brightBlue("[Rclone]    ")
     val skipped = brightYellow("[Ignoring]  ")
 

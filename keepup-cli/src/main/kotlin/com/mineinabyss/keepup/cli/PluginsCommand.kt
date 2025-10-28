@@ -23,6 +23,7 @@ import com.mineinabyss.keepup.downloads.DownloadResult
 import com.mineinabyss.keepup.downloads.github.GithubConfig
 import com.mineinabyss.keepup.downloads.github.GithubReleaseOverride
 import com.mineinabyss.keepup.downloads.gitlab.GitlabConfig
+import com.mineinabyss.keepup.downloads.keeper.KeeperConfig
 import com.mineinabyss.keepup.downloads.nexus.NexusConfig
 import com.mineinabyss.keepup.helpers.MSG
 import com.mineinabyss.keepup.helpers.clearSymlinks
@@ -115,6 +116,17 @@ class PluginsCommand : CliktCommand(name = "plugins") {
         )
     }
 
+    val keeperBaseUrl: String? by option(help = "Base URL for Keeper artifact repository")
+    val keeperAuthToken: String? by option(help = "Bearer token for authentication with Keeper repository")
+
+    val keeperConfig by lazy {
+        KeeperConfig(
+            baseUrl = keeperBaseUrl,
+            authToken = keeperAuthToken,
+            cacheExpirationTime = cacheExpirationTime,
+        )
+    }
+
     val nexusBaseUrl by option(help = "Base URL for Nexus repository")
         .default("https://repo.maven.apache.org/maven2")
     val nexusUsername by option(help = "Username for Nexus repository")
@@ -144,6 +156,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
             ),
             githubConfig = githubConfig,
             gitlabConfig = gitlabConfig,
+            keeperConfig = keeperConfig,
             nexusConfig = nexusConfig,
         )
 
