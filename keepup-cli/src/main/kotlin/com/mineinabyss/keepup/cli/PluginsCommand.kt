@@ -3,6 +3,7 @@ package com.mineinabyss.keepup.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.Abort
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.enum
@@ -204,9 +205,16 @@ class PluginsCommand : CliktCommand(name = "plugins") {
 
         runBlocking {
             val downloadResults = downloader.download(sources = sources.toTypedArray(), dest = dest, this)
+            var hasFailures = false
+            var downloadsAttempted = 0
+
             for (result in downloadResults) {
                 if (result is DownloadResult.HasFiles) {
                     linkToDest(dest, result)
+                    downloadsAttempted++
+                } else if (result is DownloadResult.Failure) {
+                    hasFailures = true
+                    downloadsAttempted++
                 }
 
                 progress?.advance(1)
@@ -215,6 +223,17 @@ class PluginsCommand : CliktCommand(name = "plugins") {
 
             progress?.clear()
             progress?.stop()
+
+            // Check if there were any failures
+            if (hasFailures) {
+                throw Abort()
+            }
+
+            // Check if downloads were attempted but no artifacts were found
+            if (downloadsAttempted == 0 && sources.isNotEmpty()) {
+                t.println("${MSG.error} No artifacts were downloaded for any of the requested plugins")
+                throw Abort()
+            }
 
             val elapsed = startTime.elapsedNow().toString(unit = DurationUnit.SECONDS, decimals = 2)
             t.println("${MSG.info} ${TextColors.brightGreen("done in $elapsed!")}")

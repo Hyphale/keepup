@@ -29,10 +29,10 @@ class KeepupConfigSync(
         configsRoot: Path,
         templateCacheDir: Path?,
         destRoot: Path,
-    ) {
+    ): Boolean {
         val config = (inventory.configs[host] ?: run {
             t.println("${MSG.error} Config not found: $host")
-            return
+            return false
         })
         val included = inventory.getOrCreateConfigs(host, configsRoot)
         val reduced = ConfigDefinition.reduce(included)
@@ -134,7 +134,11 @@ class KeepupConfigSync(
         val elapsed = startTime.elapsedNow().toString(unit = DurationUnit.SECONDS, decimals = 2)
         t.println("${MSG.info} ${brightGreen("Done synchronizing configs in $elapsed")}")
         t.println("${MSG.info} ${brightGreen("Skipped $skipCount, Copied $copyCount, Deleted $deleteCount, Generated templates $templateCount")}")
-        if (failedCount > 0) t.println("${MSG.error} $failedCount files failed to copy")
+        if (failedCount > 0) {
+            t.println("${MSG.error} $failedCount files failed to copy")
+            return false
+        }
+        return true
     }
 
     companion object {

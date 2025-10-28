@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
+import com.github.ajalt.clikt.core.Abort
 import com.mineinabyss.keepup.api.Keepup
 import com.mineinabyss.keepup.api.KeepupVersionCatalog
 import com.mineinabyss.keepup.config_sync.Inventory
@@ -76,7 +77,7 @@ class ConfigCommand : CliktCommand(name = "config") {
             t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
         }
 
-        keepup.configSync(
+        val success = keepup.configSync(
             inventory = Inventory.from(
                 templater = templater,
                 inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.filter { it.exists() }.map { it.inputStream() })),
@@ -89,5 +90,9 @@ class ConfigCommand : CliktCommand(name = "config") {
             templateCacheDir = templateCacheDir,
             destRoot = destRoot
         )
+
+        if (!success) {
+            throw Abort()
+        }
     }
 }
