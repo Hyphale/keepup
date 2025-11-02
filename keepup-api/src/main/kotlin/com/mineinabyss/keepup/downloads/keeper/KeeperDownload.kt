@@ -128,7 +128,7 @@ class KeeperDownload(
                     async {
                         HttpDownloader(
                             client = client,
-                            source = DownloadSource(artifact.source.keyInConfig, downloadUrl),
+                            source = DownloadSource(artifact.source.keyInConfig, "$baseUrl/$downloadUrl"),
                             targetDir = targetDir,
                             fileName = name,
                             transformHeader = {
