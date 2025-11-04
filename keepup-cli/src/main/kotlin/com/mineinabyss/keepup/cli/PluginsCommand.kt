@@ -149,6 +149,7 @@ class PluginsCommand : CliktCommand(name = "plugins") {
 
     override fun run() {
         val keepup = Keepup()
+        val templater = Templater()
         val downloader = keepup.downloader(
             config = KeepupDownloaderConfig(
                 downloadCache = downloadPath,
@@ -161,12 +162,12 @@ class PluginsCommand : CliktCommand(name = "plugins") {
             nexusConfig = nexusConfig,
         )
 
-        keepup.catalogParser().parse(catalog.inputStream()).also {
+        keepup.catalogParser().parse(templater, catalog.inputStream()).also {
             t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
         }
 
         val inventory = Inventory.from(
-            templater = Templater(),
+            templater = templater,
             inputStream = SequenceInputStream(Collections.enumeration(inventoryFiles.filter { it.exists() }.map { it.inputStream() })),
             enableDockerSecrets = false,
         )

@@ -73,7 +73,7 @@ class ConfigCommand : CliktCommand(name = "config") {
         val keepup = Keepup()
         val templater = Templater()
 
-        keepup.catalogParser().parse(catalogFile.inputStream()).also {
+        keepup.catalogParser().parse(templater, catalogFile.inputStream()).also {
             t.println("${MSG.info} Added ${KeepupVersionCatalog.size()} download sources")
         }
 
