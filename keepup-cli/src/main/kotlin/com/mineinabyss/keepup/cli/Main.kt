@@ -16,5 +16,6 @@ class KeepupCommand : CliktCommand() {
 fun main(args: Array<String>) = KeepupCommand().subcommands(
     PluginsCommand(),
     ConfigCommand(),
-    TemplateCommand()
+    TemplateCommand(),
+    VersionAnalysisCommand()
 ).main(args)
