@@ -40,9 +40,10 @@ class KeepupVersionsCatalogParser {
         val catalog = Yaml().decodeFromString<YamlVersionCatalog>(templatedText)
 
         catalog.catalog.forEach { (key, source) ->
+            var source = source
             catalog.versions[key.takeWhile { it != '-' }]?.let {
-                source.replace("\${version}", it)
-                source.replace("\$version", it)
+                source = source.replace("\${version}", it)
+                source = source.replace("\$version", it)
             }
             KeepupVersionCatalog[key] = DownloadSource(key, source)
         }
