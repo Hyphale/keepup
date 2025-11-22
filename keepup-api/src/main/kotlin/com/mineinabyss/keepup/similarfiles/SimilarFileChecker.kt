@@ -28,19 +28,23 @@ class SimilarFileChecker(
             it
         }
     }
+    val String.extension: String get() = takeLastWhile { it != '.' }
 
     /** Removes everything between the first digit and ext of the file */
-    fun String.removeVersion() = "${takeWhile { !it.isDigit() }}.${takeLastWhile { it != '.' }}"
+    fun String.removeVersion(): String = takeWhile { !it.isDigit() }
 
     /** Checks if two strings are similar with their versions removed or if the other is contained in the longer */
     fun similar(a: String, b: String): Boolean {
+        if (a.extension != b.extension) {
+            return false
+        }
         val a = a.removeVersion()
         val b = b.removeVersion()
-
         if (a == b) {
             return true
+        } else {
+            val (shorter, longer) = if (a.length < b.length) a to b else b to a
+            return longer.contains(shorter)
         }
-        val (shorter, longer) = if (a.length < b.length) a to b else b to a
-        return longer.contains(shorter)
     }
 }
