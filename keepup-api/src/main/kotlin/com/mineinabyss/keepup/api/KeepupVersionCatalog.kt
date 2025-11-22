@@ -1,7 +1,6 @@
 package com.mineinabyss.keepup.api
 
 import com.charleskorn.kaml.Yaml
-import com.charleskorn.kaml.decodeFromStream
 import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.downloads.parsing.DownloadSource
 import com.mineinabyss.keepup.helpers.MSG
@@ -22,7 +21,8 @@ data object KeepupVersionCatalog {
 
 @Serializable
 private data class YamlVersionCatalog(
-    val catalog: Map<String, String>
+    val catalog: Map<String, String>,
+    val versions: Map<String, String> = emptyMap()
 )
 
 class KeepupVersionsCatalogParser {
@@ -38,7 +38,12 @@ class KeepupVersionsCatalogParser {
             throw it
         }
         val catalog = Yaml().decodeFromString<YamlVersionCatalog>(templatedText)
-        catalog.catalog.forEach { key, source ->
+
+        catalog.catalog.forEach { (key, source) ->
+            catalog.versions[key.takeWhile { it != '-' }]?.let {
+                source.replace("\${version}", it)
+                source.replace("\$version", it)
+            }
             KeepupVersionCatalog[key] = DownloadSource(key, source)
         }
     }
