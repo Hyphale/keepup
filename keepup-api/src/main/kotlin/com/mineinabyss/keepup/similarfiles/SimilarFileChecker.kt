@@ -32,6 +32,15 @@ class SimilarFileChecker(
     /** Removes everything between the first digit and ext of the file */
     fun String.removeVersion() = "${takeWhile { !it.isDigit() }}.${takeLastWhile { it != '.' }}"
 
-    /** Checks if two strings are similar with their versions removed */
-    fun similar(a: String, b: String): Boolean = a.removeVersion() == b.removeVersion()
+    /** Checks if two strings are similar with their versions removed or if the other is contained in the longer */
+    fun similar(a: String, b: String): Boolean {
+        val a = a.removeVersion()
+        val b = b.removeVersion()
+
+        if (a == b) {
+            return true
+        }
+        val (shorter, longer) = if (a.length < b.length) a to b else b to a
+        return longer.contains(shorter)
+    }
 }
