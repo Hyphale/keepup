@@ -20,7 +20,6 @@ class ConfigTreeBuilder {
                 sourceRoot.isRegularFile() -> {
                     val dest = destOffset / sourceRoot.fileName
                     destToSource[dest] = sourceRoot
-                    return@forEach
                 }
                 sourceRoot.isDirectory() -> sourceRoot.walk(PathWalkOption.INCLUDE_DIRECTORIES)
                     .filter { it.isRegularFile() }

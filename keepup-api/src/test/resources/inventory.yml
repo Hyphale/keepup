@@ -1,11 +1,11 @@
 feat/example:
   copyPaths:
-    - source: should-correctly-set-dest
-      dest: plugins/example
+    - from: should-correctly-set-dest
+      to: plugins/example
     - should-correctly-default-dest
     - should-template-inventory-with-env
-    - source: should-copy-individual-files/copy-individual
-      dest: plugins/example
+    - from: should-copy-individual-files/copy-individual
+      to: plugins/example
 
 example-host:
   variables:

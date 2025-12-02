@@ -1,6 +1,6 @@
 copyPaths:
-  - source: deep/
-    dest: deep/
+  - from: deep/
+    to: deep/
 
 include:
   - should-copy-even-deeper
