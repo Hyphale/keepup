@@ -8,6 +8,7 @@ import com.mineinabyss.keepup.config_sync.Inventory
 import com.mineinabyss.keepup.config_sync.templating.Templater
 import com.mineinabyss.keepup.helpers.DockerSecrets
 import com.mineinabyss.keepup.helpers.MSG
+import com.mineinabyss.keepup.helpers.createParentDirectoriesSafely
 import com.mineinabyss.keepup.t
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -85,8 +86,8 @@ class KeepupConfigSync(
                                     failed++
                                     return@forEach
                                 }
-                                destAbsolute.createParentDirectories()
-                                cacheFile.createParentDirectories()
+                                destAbsolute.createParentDirectoriesSafely()
+                                cacheFile.createParentDirectoriesSafely()
                                 cacheFile.writeText(output)
                                 cacheFile.setLastModifiedTime(sourceModified)
                                 templateCreatedCount++
@@ -101,7 +102,7 @@ class KeepupConfigSync(
                         }
                         t.println("${MSG.copy} $source -> $destAbsolute")
                         copyCount++
-                        sourceForSkipComparison.copyTo(destAbsolute.createParentDirectories(), overwrite = true)
+                        sourceForSkipComparison.copyTo(destAbsolute.createParentDirectoriesSafely(), overwrite = true)
                         destAbsolute.setLastModifiedTime(sourceModified)
                     }
                     SyncResult(skipCount, copyCount, templateCreatedCount, failed)

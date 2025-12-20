@@ -17,3 +17,17 @@ fun clearSymlinks(path: Path) {
         if (!it.isDirectory() && it.isSymbolicLink()) it.deleteIfExists()
     }
 }
+
+/** Creates parent directories for [this] path, deleting any existing files that conflict with the directory structure. */
+fun Path.createParentDirectoriesSafely(): Path {
+    val parent = this.parent ?: return this
+    var current = parent.root ?: Path("")
+    parent.forEach { part ->
+        current = current.resolve(part)
+        if (current.exists() && current.isRegularFile()) {
+            current.deleteIfExists()
+        }
+    }
+    parent.createDirectories()
+    return this
+}
