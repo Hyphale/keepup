@@ -5,7 +5,7 @@ feat/example:
     - should-correctly-default-dest
     - should-template-inventory-with-env
     - from: should-copy-individual-files/copy-individual
-      to: plugins/example
+      to: plugins/example/
 
 example-host:
   variables:

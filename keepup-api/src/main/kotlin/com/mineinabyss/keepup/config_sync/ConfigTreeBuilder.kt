@@ -18,13 +18,21 @@ class ConfigTreeBuilder {
             val destOffset = Path(copyPath.dest)
             when {
                 sourceRoot.isRegularFile() -> {
-                    val dest = destOffset / sourceRoot.fileName
+                    val dest = if (copyPath.dest.endsWith("/") || copyPath.dest.endsWith("\\")) {
+                        destOffset / sourceRoot.fileName
+                    } else {
+                        destOffset
+                    }
                     destToSource[dest] = sourceRoot
                 }
                 sourceRoot.isDirectory() -> sourceRoot.walk(PathWalkOption.INCLUDE_DIRECTORIES)
                     .filter { it.isRegularFile() }
                     .forEach { source ->
-                        val dest = destOffset / source.relativeTo(sourceRoot)
+                        val dest = if (copyPath.dest.endsWith("/") || copyPath.dest.endsWith("\\")) {
+                            destOffset / sourceRoot.fileName / source.relativeTo(sourceRoot)
+                        } else {
+                            destOffset / source.relativeTo(sourceRoot)
+                        }
                         destToSource[dest] = source
                     }
                 else -> t.println("${MSG.warn} Included path $sourceRoot does not exist.")
