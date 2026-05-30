@@ -9,7 +9,7 @@ fun parseMap(yamlNode: YamlMap): Map<String, Any?> = yamlNode.entries.map { (key
 fun parseNode(yamlNode: YamlNode): Any? = when (yamlNode) {
     is YamlMap -> parseMap(yamlNode)
 
-    is YamlScalar -> yamlNode.content
+    is YamlScalar -> yamlNode.content.replace("\r", "")
 
     is YamlList -> yamlNode.items.map { parseNode(it) }
 
